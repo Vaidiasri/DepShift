@@ -6,9 +6,10 @@ from fastmcp import FastMCP
 
 from depshift import __version__
 from depshift.tools.git_tools import check_git_status
-from depshift.tools.manifest_tools import inspect_dependencies
-from depshift.tools.test_runner_tools import run_baseline_test
+from depshift.tools.manifest_tools import inspect_dependencies, bump_dependency_version
+from depshift.tools.test_runner_tools import run_baseline_test, execute_test_suite
 from depshift.tools.doc_tools import fetch_release_notes, extract_breaking_changes
+from depshift.tools.patch_tools import read_source_file, apply_code_patch
 
 # Initialize FastMCP Server
 mcp = FastMCP(
@@ -112,6 +113,86 @@ def tool_extract_breaking_changes(text: str) -> Dict[str, Any]:
         text: Raw release notes or markdown text.
     """
     return extract_breaking_changes(text=text)
+
+
+@mcp.tool()
+def tool_bump_dependency_version(
+    repo_path: str,
+    package_name: str,
+    target_version: str,
+) -> Dict[str, Any]:
+    """Updates the specified package version in pyproject.toml, requirements.txt, or package.json.
+
+    Args:
+        repo_path: Path to the target repository directory.
+        package_name: Package name to update.
+        target_version: Target version string (e.g. '2.0.0', '>=2.0.0', '^2.0.0').
+    """
+    return bump_dependency_version(
+        repo_path=repo_path,
+        package_name=package_name,
+        target_version=target_version,
+    )
+
+
+@mcp.tool()
+def tool_read_source_file(
+    file_path: str,
+    start_line: Optional[int] = 1,
+    end_line: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Reads a source code file with optional line-range boundaries and line numbering.
+
+    Args:
+        file_path: Absolute or relative path to the file.
+        start_line: 1-indexed start line (defaults to 1).
+        end_line: 1-indexed end line (defaults to end of file).
+    """
+    return read_source_file(
+        file_path=file_path,
+        start_line=start_line,
+        end_line=end_line,
+    )
+
+
+@mcp.tool()
+def tool_apply_code_patch(
+    file_path: str,
+    target_block: str,
+    replacement_block: str,
+) -> Dict[str, Any]:
+    """Applies an exact search-and-replace patch to a file preserving indentation and formatting.
+
+    Args:
+        file_path: Path to target file.
+        target_block: Exact block of characters/lines to be replaced.
+        replacement_block: Exact replacement string.
+    """
+    return apply_code_patch(
+        file_path=file_path,
+        target_block=target_block,
+        replacement_block=replacement_block,
+    )
+
+
+@mcp.tool()
+def tool_execute_test_suite(
+    repo_path: str = ".",
+    test_command: str = "pytest",
+    timeout_seconds: int = 120,
+) -> Dict[str, Any]:
+    """Executes the test suite with detailed output capture and structured failure extraction.
+
+    Args:
+        repo_path: Directory of the target repository.
+        test_command: Safe test runner command (e.g., 'pytest', 'npm test').
+        timeout_seconds: Maximum allowed execution time in seconds.
+    """
+    return execute_test_suite(
+        repo_path=repo_path,
+        test_command=test_command,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def main() -> None:

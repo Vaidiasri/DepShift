@@ -1,5 +1,6 @@
-"""Baseline test execution runner for DepShift with command safety guardrails."""
+"""Baseline test execution runner for DepShift with command safety guardrails and failure extraction."""
 
+import re
 import shlex
 import subprocess
 import time
@@ -36,6 +37,28 @@ def _is_safe_command(test_command: str) -> bool:
     return any(cmd_clean.startswith(prefix) for prefix in ALLOWED_TEST_PREFIXES)
 
 
+def _extract_failing_tests(output: str) -> List[Dict[str, str]]:
+    """Extracts failing test file paths and error messages from pytest / jest / npm output."""
+    failures: List[Dict[str, str]] = []
+    # Pytest failure pattern: FAILED path/to/test.py::test_func - ErrorReason
+    pytest_matches = re.findall(r"FAILED\s+([^\s:]+::[^\s]+)(?:\s+-\s+(.*))?", output)
+    for test_id, reason in pytest_matches:
+        failures.append({
+            "test_target": test_id,
+            "reason": reason.strip() if reason else "Assertion / Exception failure",
+        })
+
+    # Jest / vitest pattern: FAIL src/foo.test.js
+    jest_matches = re.findall(r"FAIL\s+([^\s]+)", output)
+    for test_path in jest_matches:
+        failures.append({
+            "test_target": test_path,
+            "reason": "Test suite failure",
+        })
+
+    return failures
+
+
 def run_baseline_test(
     repo_path: str = ".",
     test_command: str = "pytest",
@@ -52,6 +75,28 @@ def run_baseline_test(
         Structured test result dictionary including pass/fail status, exit code,
         duration, stdout, and stderr.
     """
+    return execute_test_suite(
+        repo_path=repo_path,
+        test_command=test_command,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def execute_test_suite(
+    repo_path: str = ".",
+    test_command: str = "pytest",
+    timeout_seconds: int = 120,
+) -> Dict[str, Any]:
+    """Executes the test suite with detailed output capture and structured failure extraction.
+
+    Args:
+        repo_path: Directory of the target repository.
+        test_command: Safe test runner command.
+        timeout_seconds: Maximum execution time in seconds.
+
+    Returns:
+        Structured result including success, exit code, failing tests list, stdout, and stderr.
+    """
     path = Path(repo_path).resolve()
     if not path.exists():
         return {
@@ -59,6 +104,7 @@ def run_baseline_test(
             "status": "error",
             "exit_code": -1,
             "duration_seconds": 0.0,
+            "failing_tests": [],
             "stdout": "",
             "stderr": f"Repository directory '{repo_path}' does not exist.",
         }
@@ -70,6 +116,7 @@ def run_baseline_test(
             "status": "blocked",
             "exit_code": -1,
             "duration_seconds": 0.0,
+            "failing_tests": [],
             "stdout": "",
             "stderr": (
                 f"Command '{test_command}' was blocked by safety policy. "
@@ -85,6 +132,7 @@ def run_baseline_test(
             "status": "error",
             "exit_code": -1,
             "duration_seconds": 0.0,
+            "failing_tests": [],
             "stdout": "",
             "stderr": f"Failed to parse test command: {e}",
         }
@@ -104,6 +152,8 @@ def run_baseline_test(
         stdout = process.stdout or ""
         stderr = process.stderr or ""
 
+        failing_tests = _extract_failing_tests(stdout + "\n" + stderr)
+
         # Bound output length to avoid flooding LLM token context
         if len(stdout) > MAX_OUTPUT_CHARS:
             stdout = stdout[:MAX_OUTPUT_CHARS] + f"\n... [Truncated: {len(stdout) - MAX_OUTPUT_CHARS} characters]"
@@ -115,6 +165,7 @@ def run_baseline_test(
             "status": "passed" if success else "failed",
             "exit_code": process.returncode,
             "duration_seconds": duration,
+            "failing_tests": failing_tests,
             "stdout": stdout,
             "stderr": stderr,
         }
@@ -126,6 +177,7 @@ def run_baseline_test(
             "status": "timeout",
             "exit_code": -1,
             "duration_seconds": duration,
+            "failing_tests": [],
             "stdout": "",
             "stderr": f"Test execution timed out after {timeout_seconds} seconds.",
         }
@@ -136,6 +188,7 @@ def run_baseline_test(
             "status": "command_not_found",
             "exit_code": -1,
             "duration_seconds": duration,
+            "failing_tests": [],
             "stdout": "",
             "stderr": f"Command '{args[0]}' not found on host system: {e}",
         }
@@ -146,6 +199,7 @@ def run_baseline_test(
             "status": "error",
             "exit_code": -1,
             "duration_seconds": duration,
+            "failing_tests": [],
             "stdout": "",
             "stderr": f"Unexpected execution failure: {e}",
         }

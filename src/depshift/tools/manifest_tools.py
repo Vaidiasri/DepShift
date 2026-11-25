@@ -3,7 +3,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import tomllib
 
 
@@ -162,5 +162,103 @@ def inspect_dependencies(repo_path: str = ".") -> Dict[str, Any]:
         "total_dependencies": len(all_deps),
         "total_dev_dependencies": len(all_dev_deps),
         "warnings": warnings,
+        "error": None,
+    }
+
+
+def bump_dependency_version(
+    repo_path: str,
+    package_name: str,
+    target_version: str,
+) -> Dict[str, Any]:
+    """Updates the specified package version in pyproject.toml, requirements.txt, or package.json.
+
+    Args:
+        repo_path: Path to repository root.
+        package_name: Package name to upgrade.
+        target_version: New version string (e.g. '2.0.0', '>=2.0.0', '^2.0.0').
+
+    Returns:
+        Structured result indicating success, modified files, and applied version specifier.
+    """
+    path = Path(repo_path).resolve()
+    if not path.exists():
+        return {
+            "success": False,
+            "modified_files": [],
+            "package_name": package_name,
+            "target_version": target_version,
+            "error": f"Path '{repo_path}' does not exist.",
+        }
+
+    pkg_clean = package_name.strip()
+    target_clean = target_version.strip()
+    # Normalize version specifier if bare version provided
+    py_spec = target_clean if any(target_clean.startswith(op) for op in ("==", ">=", "<=", "~=", "^")) else f">={target_clean}"
+    node_spec = target_clean if any(target_clean.startswith(op) for op in ("^", "~", ">=", "<=", "=")) else f"^{target_clean}"
+
+    modified_files: List[str] = []
+
+    # 1. Check pyproject.toml
+    pyproject_file = path / "pyproject.toml"
+    if pyproject_file.exists():
+        content = pyproject_file.read_text(encoding="utf-8")
+        # Match "package" or 'package' with optional version constraints
+        pattern = re.compile(rf"""(["']){re.escape(pkg_clean)}(?:[><=~!^][^"']*)?\1""", re.IGNORECASE)
+        if pattern.search(content):
+            new_content = pattern.sub(rf'\g<1>{pkg_clean}{py_spec}\g<1>', content)
+            if new_content != content:
+                pyproject_file.write_text(new_content, encoding="utf-8")
+                modified_files.append("pyproject.toml")
+
+    # 2. Check requirements.txt
+    req_file = path / "requirements.txt"
+    if req_file.exists():
+        lines = req_file.read_text(encoding="utf-8").splitlines()
+        new_lines: List[str] = []
+        changed = False
+        req_pattern = re.compile(rf"^{re.escape(pkg_clean)}(?:\s*[><=~!^].*)?$", re.IGNORECASE)
+        for line in lines:
+            if req_pattern.match(line.strip()):
+                new_lines.append(f"{pkg_clean}{py_spec}")
+                changed = True
+            else:
+                new_lines.append(line)
+        if changed:
+            req_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+            modified_files.append("requirements.txt")
+
+    # 3. Check package.json
+    pkg_json_file = path / "package.json"
+    if pkg_json_file.exists():
+        try:
+            data = json.loads(pkg_json_file.read_text(encoding="utf-8"))
+            changed = False
+            if "dependencies" in data and pkg_clean in data["dependencies"]:
+                data["dependencies"][pkg_clean] = node_spec
+                changed = True
+            if "devDependencies" in data and pkg_clean in data["devDependencies"]:
+                data["devDependencies"][pkg_clean] = node_spec
+                changed = True
+            if changed:
+                pkg_json_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+                modified_files.append("package.json")
+        except Exception:
+            pass
+
+    if not modified_files:
+        return {
+            "success": False,
+            "modified_files": [],
+            "package_name": pkg_clean,
+            "target_version": target_clean,
+            "error": f"Package '{pkg_clean}' not found in any manifest file.",
+        }
+
+    return {
+        "success": True,
+        "modified_files": modified_files,
+        "package_name": pkg_clean,
+        "target_version": py_spec,
         "error": None,
     }

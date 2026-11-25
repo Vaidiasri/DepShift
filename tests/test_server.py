@@ -34,6 +34,10 @@ async def test_mcp_instance():
         "tool_run_baseline_test",
         "tool_fetch_release_notes",
         "tool_extract_breaking_changes",
+        "tool_bump_dependency_version",
+        "tool_read_source_file",
+        "tool_apply_code_patch",
+        "tool_execute_test_suite",
     ]
     for expected in expected_tools:
         assert expected in tool_names
