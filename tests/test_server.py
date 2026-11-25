@@ -22,9 +22,16 @@ def test_get_version():
 
 @pytest.mark.asyncio
 async def test_mcp_instance():
-    """Verify the FastMCP server instance is correctly initialized with registered tools."""
+    """Verify the FastMCP server instance is correctly initialized with all registered tools."""
     assert mcp.name == "depshift"
     tools = await mcp.list_tools()
     tool_names = [tool.name for tool in tools]
-    assert "ping" in tool_names
-    assert "get_version" in tool_names
+    expected_tools = [
+        "ping",
+        "get_version",
+        "tool_check_git_status",
+        "tool_inspect_dependencies",
+        "tool_run_baseline_test",
+    ]
+    for expected in expected_tools:
+        assert expected in tool_names
