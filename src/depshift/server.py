@@ -1,13 +1,14 @@
 """Core FastMCP server implementation for DepShift."""
 
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from fastmcp import FastMCP
 
 from depshift import __version__
 from depshift.tools.git_tools import check_git_status
 from depshift.tools.manifest_tools import inspect_dependencies
 from depshift.tools.test_runner_tools import run_baseline_test
+from depshift.tools.doc_tools import fetch_release_notes, extract_breaking_changes
 
 # Initialize FastMCP Server
 mcp = FastMCP(
@@ -75,6 +76,42 @@ def tool_run_baseline_test(
         test_command=test_command,
         timeout_seconds=timeout_seconds,
     )
+
+
+@mcp.tool()
+def tool_fetch_release_notes(
+    package_name: str,
+    from_version: Optional[str] = None,
+    to_version: Optional[str] = None,
+    ecosystem: str = "python",
+    github_repo: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Fetches changelogs or release notes for a package from PyPI, npm, or GitHub Releases.
+
+    Args:
+        package_name: Name of package (e.g. 'pydantic', 'fastmcp', 'express').
+        from_version: Currently installed version.
+        to_version: Target version upgrading to.
+        ecosystem: 'python' or 'node'.
+        github_repo: Optional 'owner/repo' override (e.g. 'pydantic/pydantic').
+    """
+    return fetch_release_notes(
+        package_name=package_name,
+        from_version=from_version,
+        to_version=to_version,
+        ecosystem=ecosystem,
+        github_repo=github_repo,
+    )
+
+
+@mcp.tool()
+def tool_extract_breaking_changes(text: str) -> Dict[str, Any]:
+    """Scans release notes or documentation text to extract breaking changes and migration notices.
+
+    Args:
+        text: Raw release notes or markdown text.
+    """
+    return extract_breaking_changes(text=text)
 
 
 def main() -> None:
