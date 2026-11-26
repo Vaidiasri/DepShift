@@ -2,7 +2,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-green.svg)](https://modelcontextprotocol.io/)
-[![CI Status](https://img.shields.io/badge/tests-32%20passed-brightgreen.svg)]()
+[![CI Status](https://img.shields.io/badge/tests-37%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **DepShift** is an autonomous, context-aware dependency migration and security remediation agent packaged as a **Model Context Protocol (MCP)** server.
@@ -90,6 +90,8 @@ DepShift exposes a suite of specialized tools over the Model Context Protocol:
 | **Diagnostics** | `ping` | Health-check tool verifying MCP server connectivity. |
 | **Diagnostics** | `get_version` | Returns server metadata, version, runtime Python, and host platform. |
 | **Git Safety** | `tool_check_git_status` | Verifies clean working tree, active branch, and valid git repository. |
+| **Git Lifecycle** | `tool_create_migration_branch` | Creates and checks out a dedicated migration branch for the upgrade. |
+| **Git Lifecycle** | `tool_commit_migration_step` | Stages files and commits intermediate refactoring steps with clear messages. |
 | **Manifests** | `tool_inspect_dependencies` | Detects project ecosystems and extracts dependencies across Python/Node. |
 | **Manifests** | `tool_bump_dependency_version` | Safely updates dependency version specifier in manifest files. |
 | **Intelligence** | `tool_fetch_release_notes` | Fetches release notes from PyPI, npm, and GitHub Releases. |
@@ -98,6 +100,7 @@ DepShift exposes a suite of specialized tools over the Model Context Protocol:
 | **Refactoring** | `tool_apply_code_patch` | Performs precision search-and-replace patches without corrupting code. |
 | **Test Runner** | `tool_run_baseline_test` | Executes test suite with strict security guardrails and timeout bounds. |
 | **Test Runner** | `tool_execute_test_suite` | Runs tests and returns structured failure lists with error reasons. |
+| **Reporting** | `tool_generate_migration_summary` | Generates complete audit-ready Markdown PR summaries with diff stats. |
 
 ---
 

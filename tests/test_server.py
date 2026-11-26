@@ -30,6 +30,8 @@ async def test_mcp_instance():
         "ping",
         "get_version",
         "tool_check_git_status",
+        "tool_create_migration_branch",
+        "tool_commit_migration_step",
         "tool_inspect_dependencies",
         "tool_run_baseline_test",
         "tool_fetch_release_notes",
@@ -38,6 +40,7 @@ async def test_mcp_instance():
         "tool_read_source_file",
         "tool_apply_code_patch",
         "tool_execute_test_suite",
+        "tool_generate_migration_summary",
     ]
     for expected in expected_tools:
-        assert expected in tool_names
+        assert expected in tool_names, f"Expected tool '{expected}' missing from registered tools"

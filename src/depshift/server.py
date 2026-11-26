@@ -1,15 +1,20 @@
 """Core FastMCP server implementation for DepShift."""
 
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from fastmcp import FastMCP
 
 from depshift import __version__
-from depshift.tools.git_tools import check_git_status
+from depshift.tools.git_tools import (
+    check_git_status,
+    create_migration_branch,
+    commit_migration_step,
+)
 from depshift.tools.manifest_tools import inspect_dependencies, bump_dependency_version
 from depshift.tools.test_runner_tools import run_baseline_test, execute_test_suite
 from depshift.tools.doc_tools import fetch_release_notes, extract_breaking_changes
 from depshift.tools.patch_tools import read_source_file, apply_code_patch
+from depshift.tools.report_tools import generate_migration_summary
 
 # Initialize FastMCP Server
 mcp = FastMCP(
@@ -47,6 +52,49 @@ def tool_check_git_status(repo_path: str = ".") -> Dict[str, Any]:
         repo_path: Path to the target git repository (defaults to current directory).
     """
     return check_git_status(repo_path=repo_path)
+
+
+@mcp.tool()
+def tool_create_migration_branch(
+    repo_path: str = ".",
+    package_name: str = "",
+    target_version: str = "",
+    branch_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Creates and checks out a new git branch for the migration work.
+
+    Args:
+        repo_path: Path to target git repository.
+        package_name: Name of package being upgraded (e.g. 'pydantic').
+        target_version: Target version (e.g. '2.0.0').
+        branch_name: Optional custom branch name override.
+    """
+    return create_migration_branch(
+        repo_path=repo_path,
+        package_name=package_name,
+        target_version=target_version,
+        branch_name=branch_name,
+    )
+
+
+@mcp.tool()
+def tool_commit_migration_step(
+    repo_path: str = ".",
+    message: str = "chore(depshift): automated migration step",
+    files_to_commit: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Stages files and creates a git commit for an intermediate migration step.
+
+    Args:
+        repo_path: Path to target git repository.
+        message: Informative commit message.
+        files_to_commit: Optional explicit list of file paths to stage.
+    """
+    return commit_migration_step(
+        repo_path=repo_path,
+        message=message,
+        files_to_commit=files_to_commit,
+    )
 
 
 @mcp.tool()
@@ -192,6 +240,35 @@ def tool_execute_test_suite(
         repo_path=repo_path,
         test_command=test_command,
         timeout_seconds=timeout_seconds,
+    )
+
+
+@mcp.tool()
+def tool_generate_migration_summary(
+    repo_path: str = ".",
+    package_name: str = "",
+    from_version: Optional[str] = None,
+    to_version: Optional[str] = None,
+    base_branch: str = "main",
+    test_suite_status: str = "passed",
+) -> Dict[str, Any]:
+    """Generates an audit-ready Markdown migration report comparing changes against base branch.
+
+    Args:
+        repo_path: Path to target git repository.
+        package_name: Name of migrated package.
+        from_version: Original version.
+        to_version: New bumped version.
+        base_branch: Branch to compare diff against (defaults to 'main').
+        test_suite_status: Final status of the test suite ('passed' or 'failed').
+    """
+    return generate_migration_summary(
+        repo_path=repo_path,
+        package_name=package_name,
+        from_version=from_version,
+        to_version=to_version,
+        base_branch=base_branch,
+        test_suite_status=test_suite_status,
     )
 
 
